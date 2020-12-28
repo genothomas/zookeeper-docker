@@ -1,25 +1,18 @@
-FROM openjdk:8u212-jre-alpine
-
-MAINTAINER Wurstmeister
-
-ENV ZOOKEEPER_VERSION="3.4.14"
-ENV ZK_HOME /opt/zookeeper-${ZOOKEEPER_VERSION}
-
-COPY download-zookeeper.sh /tmp
-
-RUN \
- apk --update add gpgme bash curl jq && \
- /tmp/download-zookeeper.sh && \
- mkdir -p /opt && \
- tar -xzf /tmp/zookeeper-${ZOOKEEPER_VERSION}.tar.gz -C /opt && \
- mv /opt/zookeeper-${ZOOKEEPER_VERSION}/conf/zoo_sample.cfg /opt/zookeeper-${ZOOKEEPER_VERSION}/conf/zoo.cfg && \
- sed  -i "s|/tmp/zookeeper|$ZK_HOME/data|g" $ZK_HOME/conf/zoo.cfg; mkdir $ZK_HOME/data && \
- ln -s /opt/zookeeper-${ZOOKEEPER_VERSION} /opt/zookeeper && \
- apk del gpgme curl jq && rm -rf /var/cache/apk/*
-
-ADD start-zk.sh /usr/bin/start-zk.sh 
+FROM openjdk:8-jre-alpine
+ARG ZK_VER=3.5.8
+ENV ZK_HOME=/opt/zookeeper-latest
+RUN cd /tmp && apk add --no-cache bash tzdata \
+    && wget -q https://downloads.apache.org/zookeeper/zookeeper-${ZK_VER}/apache-zookeeper-${ZK_VER}-bin.tar.gz \
+    && wget -q https://downloads.apache.org/zookeeper/zookeeper-${ZK_VER}/apache-zookeeper-${ZK_VER}-bin.tar.gz.sha512 \
+    && sha512sum -c apache-zookeeper-${ZK_VER}-bin.tar.gz.sha512 \
+    && tar -xzf apache-zookeeper-${ZK_VER}-bin.tar.gz -C /opt \
+    && ln -s /opt/apache-zookeeper-* $ZK_HOME \
+    && mkdir -p $ZK_HOME/data \
+    && mv $ZK_HOME/conf/zoo_sample.cfg $ZK_HOME/conf/zoo.cfg \
+    && sed -i "s|/tmp/zookeeper|$ZK_HOME/data|g" $ZK_HOME/conf/zoo.cfg \
+    && sed -i -r "s|#autopurge|autopurge|g" $ZK_HOME/conf/zoo.cfg \
+    && rm /tmp/* \
+    && rm -rf /var/cache/apk/*
+WORKDIR $ZK_HOME
 EXPOSE 2181 2888 3888
-
-VOLUME ["/opt/zookeeper-${ZOOKEEPER_VERSION}/conf", "/opt/zookeeper-${ZOOKEEPER_VERSION}/data"]
-
-CMD ["/bin/sh", "/usr/bin/start-zk.sh"]
+CMD ["bin/zkServer.sh", "start-foreground"]
